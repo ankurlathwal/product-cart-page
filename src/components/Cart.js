@@ -1,5 +1,6 @@
 import React, {Component} from 'react';
 import styles from './cart.module.css';
+import {applyDiscountPromo, applyReductionPromo} from '../lib/promos';
 
 class Cart extends Component{
     constructor(props){
@@ -125,10 +126,37 @@ class Cart extends Component{
     applyPromo(){
         const promo = this.props.promoCodes.find((e)=>e.code===this.state.promoCode);
         if(promo.type === "discount"){
-            this.applyDiscountPromo(promo);
+            let result = applyDiscountPromo(promo, this.getTotalPrice(), this.state.cartProducts);
+            if(result===false){
+                this.setState({
+                    invalidPromo: true,
+                    promoError: true
+                })
+            }
+            else{
+                this.setState({ 
+                    totalPrice: result,
+                    promoApplied: true
+                })
+            }
         }
         else if(promo.type === "reduction"){
-            this.applyReductionPromo(promo);
+            let result = applyReductionPromo(promo, this.getTotalPrice(), this.state.cartProducts, this.state.products);
+            if(result===false){
+                this.setState({
+                    invalidPromo: true,
+                    promoError: true
+                })
+            }
+            else{
+                this.setState({
+                    products: result,
+                    promoApplied: true
+                },()=>{
+                    this.setTotalPrice();
+                })
+            }
+
         }
     }
 
@@ -138,102 +166,9 @@ class Cart extends Component{
         })
     }
 
-    // needs - promo obj, totalprice, cartProducts, 
-    applyDiscountPromo(promo){
-        // check minimum cost and quantity eligibility
-        if(this.getTotalPrice()<promo.minCost){
-            this.setState({
-                invalidPromo: true,
-                promoError: true
-            })
-            return;
-        }
-        // check if promo is applied to all products of specific to a product
-        if(promo.eligibleProducts.findIndex((e)=>e==='all')<0)
-        {
-            let exists = true;
-            // it's not for all, then check if that specific product(s) exists in cart
-            promo.eligibleProducts.forEach((product)=>{
-                if(this.state.cartProducts.findIndex((e)=>e.id===product)<0){
-                    exists = false;
-                }
-            })
-            if(!exists){
-                this.setState({
-                    invalidPromo: true,
-                    promoError: true
-                })
-                return;
-            }
-            
-        }
-
-        // apply discount promo
-        let totalPrice = this.state.totalPrice;
-        if(promo.unit === 'percent'){
-            totalPrice -= (totalPrice*promo.value)/100;
-        }
-        else if(promo.unit === 'flat'){
-            totalPrice -= promo.value;
-        }
-        this.setState({ 
-            totalPrice: totalPrice,
-            promoApplied: true
-        })
-
-        
-    }
-
-    applyReductionPromo(promo){
-        if(this.getTotalPrice()<promo.minCost){
-            this.setState({
-                invalidPromo: true,
-                promoError: true
-            })
-            return;
-        }
-        let exists = true;
-        // check if products exists and has minimum qunatity
-        promo.eligibleProducts.forEach((product)=>{
-            
-            let cartProduct = this.state.cartProducts.find((e)=>e.id===product);
-            if(!cartProduct || cartProduct.quantity<promo.minQuantity){
-                exists = false
-            }
-        })
-        if(!exists){
-            this.setState({
-                invalidPromo: true,
-                promoError: true
-            })
-            return;
-        }
-
-        // apply reduction to each eligible product in cart
-        let products = [...this.state.products];
-        promo.eligibleProducts.forEach((eligibleProduct)=>{
-            const index = products.findIndex((e)=>e.id===eligibleProduct);
-            if(index>-1){
-                if(promo.unit==='reducedPrice'){
-                    products[index].reducedPrice = promo.value;
-                }
-                else if(promo.type==='flat'){
-                    products[index].reducedPrice = products[index].price - promo.value;
-                }
-                else if(promo.type==='percent'){
-                    products[index].reducedPrice = (products[index].price) - (products[index].price*promo.value)/100;
-                }
-                
-            }
-        })
-        this.setState({
-            products: products,
-            promoApplied: true
-        },()=>{
-            this.setTotalPrice();
-        })
-
-    }
+    
+ // needs - promo obj, totalprice, cartProducts, allProducts
+    
 
 
     render(){
